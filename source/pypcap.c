@@ -1,5 +1,6 @@
 #include <pcap.h>
 #include "pypcap.h"
+#include "writer.h"
 
 /*
 Methods to create python objects
@@ -116,16 +117,16 @@ PyMODINIT_FUNC
 PyInit_pypcap(void)
 {
     PyObject *m;
-    if (PyType_Ready(&InterfaceType) < 0)
+    if (PyType_Ready(&PcapWriterType) < 0)
         return NULL;
 
     m = PyModule_Create(&pypcap);
     if(m == NULL)
         return NULL;
 
-    Py_INCREF(&InterfaceType);
-    if(PyModule_AddObject(m, "Interface", (PyObject *) &InterfaceType) < 0){
-        Py_DECREF(&InterfaceType);
+    Py_INCREF(&PcapWriterType);
+    if(PyModule_AddObject(m, "PcapWriter", (PyObject *) &PcapWriterType) < 0){
+        Py_DECREF(&PcapWriterType);
         Py_DECREF(m);
         return NULL;
     };

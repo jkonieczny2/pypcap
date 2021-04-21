@@ -17,3 +17,7 @@ if __name__ == '__main__':
         print('File contents do not match expected')
     finally:
         os.remove(filename)
+
+    # test creation of PcapWriter object
+    writer = pypcap.PcapWriter(filename="foobar")
+    assert(writer is not None)
