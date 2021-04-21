@@ -28,4 +28,3 @@ static PyObject *pcap_writer(PyObject *self, PyObject *args);
 Methods for creating Python objects from pcap structs
 */
 PyObject *Py_Build_Interface(pcap_if_t *iface);
-PyObject *Py_Build_Interface_List(int size, pcap_if_t *iface);

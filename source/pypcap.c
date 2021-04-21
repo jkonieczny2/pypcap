@@ -4,26 +4,26 @@
 /*
 Methods to create python objects
 */
+
+/*
+Return a PyDict containing interface details
+*/
 PyObject *Py_Build_Interface(pcap_if_t *iface){
-    // might want to try building a pydict, custom object is a PITA
-    PyObject *iface_name = Py_BuildValue("s", iface->name);
-    return iface_name;
-}
+    PyObject *iface_dict = Py_BuildValue(
+        "{s:s, s:s}",
+        "name", iface->name,
+        "description", iface->description
+    );
 
-PyObject *Py_Build_Interface_List(int size, pcap_if_t *iface){
-    PyObject *iface_list = PyList_New(size);
-
-    for(int i=0; i<size; i++){
-        PyObject *iface_name = Py_Build_Interface(iface);
-        PyList_SetItem(iface_list, i, iface_name);
-        iface = iface->next; // you have to get the size right or this will segfault!!!
+    if (iface_dict == NULL){
+        PyErr_NoMemory(); //lol
     }
 
-    return iface_list;
+    return iface_dict;
 }
 
 /*
-Return array of all network devices on this machine
+Return dict of all network devices on this machine
 */
 static PyObject *
 find_all_devs(PyObject *self, PyObject *args)
@@ -40,21 +40,20 @@ find_all_devs(PyObject *self, PyObject *args)
         return PyUnicode_FromString(errbuf);
     }
 
-    // count ifaces to get array size
-    pcap_if_t *iface_first = iface;
-    int iface_count = 0;
-    while(iface->next){
-        iface_count++;
+    // build dict of interface details
+    PyObject *iface_dict = PyDict_New();
+
+    while(iface != NULL){
+        PyObject *idict = Py_Build_Interface(iface);
+        PyObject *iface_name = Py_BuildValue("s", iface->name);
+        PyDict_SetItem(iface_dict, iface_name, idict);
         iface = iface->next;
     }
-
-    // Store ifaces in Python list
-    PyObject *iface_list = Py_Build_Interface_List(iface_count, iface_first);
 
     // clean up iface objects
     pcap_freealldevs(iface);
 
-    return iface_list;
+    return iface_dict;
 };
 
 static PyObject *
