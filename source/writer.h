@@ -11,7 +11,6 @@ typedef struct{
     const char *_c_mode; // store c file open mode
     PyObject *filename; //name of file to write to
     PyObject *mode;
-    int _closed;
     FILE *fp;
 } PcapWriter;
 
@@ -55,16 +54,11 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
     self->_c_mode = m;
 
     // create file pointer
-    // start with _closed = 1 or dealloc segfaults if file can't be opened
-    self->_closed = 1;
-    
     FILE *fp = fopen(f, m);
     if(fp == NULL){
         PyErr_Format(PyExc_SystemError, "Could not open file '%s'", self->_c_filename);
         return -1;
     }
-
-    self->_closed = 0;
     self->fp = fp;
 
     // set PyObject attributes
@@ -106,7 +100,7 @@ PcapWriter_name(PcapWriter *self, PyObject *Py_UNUSED(ignored))
 static PyObject * // cannot return 0 for a Py C function, lol
 PcapWriter_close(PcapWriter *self, PyObject *Py_UNUSED(ignored))
 {
-    if(self->_closed)
+    if(self->fp == NULL)
         return Py_BuildValue("");
 
     int i = fclose(self->fp);
@@ -115,7 +109,7 @@ PcapWriter_close(PcapWriter *self, PyObject *Py_UNUSED(ignored))
         return 0;
     }
 
-    self->_closed = 1;
+    self->fp = NULL;
     return Py_BuildValue(""); // return None
 }
 
@@ -179,7 +173,8 @@ static int PcapWriter_set_mode(PcapWriter *self, PyObject *value, void *closure)
 static PyObject *
 PcapWriter_get_closed(PcapWriter *self, PyObject *value, void *closure)
 {
-    return PyBool_FromLong((long) self->_closed); // we don't incref because creation implies refcount=1
+    int _closed = (self->fp == NULL);
+    return PyBool_FromLong((long) _closed); // we don't incref because creation implies refcount=1
 }
 
 static int PcapWriter_set_closed(PcapWriter *self, PyObject *value, void *closure)
@@ -217,7 +212,7 @@ static void
 PcapWriter_dealloc(PcapWriter *self)
 {
     /* close the file pointer */
-    if(!self->_closed)
+    if(self->fp != NULL)
         fclose(self->fp);
 
     /* dealloc with cyclic GC check */

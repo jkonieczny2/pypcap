@@ -34,3 +34,8 @@ class TestWriter(unittest.TestCase):
         assert(writer.filename == 'foo')
         assert(writer.mode == 'wb')
         assert(writer.closed == True)
+
+    def test_error_on_failed_open(self):
+        def open_bad_file():
+            w = pypcap.PcapWriter('')
+        self.assertRaises(SystemError, open_bad_file)
