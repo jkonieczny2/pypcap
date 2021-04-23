@@ -1,12 +1,18 @@
 #define PY_SSIZE_T_CLEAN
 #include <assert.h>
 #include <Python.h>
+#include <string.h>
 #include <structmember.h>
 
 typedef struct{
     PyObject_HEAD
     /* type specific fields*/
+    const char *_c_filename;  // store c string filename
+    const char *_c_mode; // store c file open mode
     PyObject *filename; //name of file to write to
+    PyObject *mode;
+    int _closed;
+    FILE *fp;
 } PcapWriter;
 
 /* creation method */
@@ -22,22 +28,47 @@ PcapWriter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             Py_DECREF(self);
             return NULL;
         }
+        self->mode = PyUnicode_FromString("wb");
+        if(self->mode == NULL){
+            Py_DECREF(self);
+            return NULL;
+        }
     }
     return (PyObject *) self;
 }
-
 
 /* initialization method */
 static int
 PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"filename", NULL};
-    PyObject *filename = NULL, *tmp;
+    char *f;
+    const char m[] = "wb"; // for now, we only support wb mode
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|U", kwlist, &filename)){ // pipe separates varags from kwargs
+    static char *kwlist[] = {"filename", NULL};
+    PyObject *filename = NULL, *mode=NULL, *tmp;
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &f)){
         return -1;
     }
 
+    self->_c_filename = f;
+    self->_c_mode = m;
+
+    // create file pointer
+    // start with _closed = 1 or dealloc segfaults if file can't be opened
+    self->_closed = 1;
+    
+    FILE *fp = fopen(f, m);
+    if(fp == NULL){
+        PyErr_Format(PyExc_SystemError, "Could not open file '%s'", self->_c_filename);
+        return -1;
+    }
+
+    self->_closed = 0;
+    self->fp = fp;
+
+    // set PyObject attributes
+    filename = PyUnicode_FromString(f);
     if(filename){
         /*
         when initializing custom members, copy existing to temp var
@@ -47,6 +78,14 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
         Py_INCREF(filename);
         self->filename = filename;
         Py_DECREF(tmp); // getter/setter ensure this is never NULL, so no need to use XDECREF
+    }
+
+    mode = PyUnicode_FromString(m);
+    if(mode){
+        tmp = self->mode;
+        Py_INCREF(mode);
+        self->mode = mode;
+        Py_DECREF(tmp);
     }
 
     return 0;
@@ -63,15 +102,32 @@ PcapWriter_name(PcapWriter *self, PyObject *Py_UNUSED(ignored))
     return PyUnicode_FromFormat("%S", self->filename);
 }
 
+/* close method */
+static PyObject * // cannot return 0 for a Py C function, lol
+PcapWriter_close(PcapWriter *self, PyObject *Py_UNUSED(ignored))
+{
+    if(self->_closed)
+        return Py_BuildValue("");
+
+    int i = fclose(self->fp);
+    if(i !=0 ){
+        PyErr_Format(PyExc_SystemError, "Could not close file '%S'", self->filename);
+        return 0;
+    }
+
+    self->_closed = 1;
+    return Py_BuildValue(""); // return None
+}
+
 /* expose attributes as custom members */
 static PyMemberDef PcapWriter_members[] = {
-//    {"filename", T_OBJECT_EX, offsetof(PcapWriter, filename), 0, "filename"},
     {NULL}
 };
 
 /* expose methods */
 static PyMethodDef PcapWriter_methods[] = {
     {"name", (PyCFunction) PcapWriter_name, METH_NOARGS, "Returns filename of PcapWriter object"},
+    {"close", (PyCFunction) PcapWriter_close, METH_NOARGS, "Close the object's file pointer"},
     {NULL}
 };
 
@@ -85,6 +141,9 @@ PcapWriter_get_filename(PcapWriter *self, void *closure)
 
 static int PcapWriter_set_filename(PcapWriter *self, PyObject *value, void *closure)
 {
+    PyErr_SetString(PyExc_TypeError, "filename attribute can only be set on initialization");
+    return -1;
+
     PyObject *tmp;
 
     /* prevent people from making attribute pointer NULL */
@@ -104,8 +163,35 @@ static int PcapWriter_set_filename(PcapWriter *self, PyObject *value, void *clos
     return 0;
 }
 
+static PyObject *
+PcapWriter_get_mode(PcapWriter *self, void *closure)
+{
+    Py_INCREF(self->mode);
+    return self->mode;
+}
+
+static int PcapWriter_set_mode(PcapWriter *self, PyObject *value, void *closure)
+{
+    PyErr_SetString(PyExc_TypeError, "mode attribute can only be set on initialization");
+    return -1;
+}
+
+static PyObject *
+PcapWriter_get_closed(PcapWriter *self, PyObject *value, void *closure)
+{
+    return PyBool_FromLong((long) self->_closed); // we don't incref because creation implies refcount=1
+}
+
+static int PcapWriter_set_closed(PcapWriter *self, PyObject *value, void *closure)
+{
+    PyErr_SetString(PyExc_AttributeError, "closed attribute is read-only");
+    return -1;
+}
+
 static PyGetSetDef PcapWriter_getsetters[] = { 
     {"filename", (getter) PcapWriter_get_filename, (setter) PcapWriter_set_filename, "filename", NULL},
+    {"mode", (getter) PcapWriter_get_mode, (setter) PcapWriter_set_mode, "mode", NULL},
+    {"closed", (getter) PcapWriter_get_closed, (setter) PcapWriter_set_closed, "closed", NULL},
     {NULL}
 };
 
@@ -114,6 +200,7 @@ static int
 PcapWriter_traverse(PcapWriter *self, visitproc visit, void *arg)
 {
     Py_VISIT(self->filename);
+    Py_VISIT(self->mode);
     return 0;
 }
 
@@ -121,6 +208,7 @@ static int
 PcapWriter_clear(PcapWriter *self)
 {
     Py_CLEAR(self->filename);
+    Py_CLEAR(self->mode);
     return 0;
 }
 
@@ -128,8 +216,9 @@ PcapWriter_clear(PcapWriter *self)
 static void
 PcapWriter_dealloc(PcapWriter *self)
 {
-    /* deallocate all Python objects on the class */
-    //Py_XDECREF(self->filename); // always needs to be null-safe.  may have failed to set in tp_new
+    /* close the file pointer */
+    if(!self->_closed)
+        fclose(self->fp);
 
     /* dealloc with cyclic GC check */
     PyObject_GC_UnTrack(self);
