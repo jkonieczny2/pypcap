@@ -64,7 +64,6 @@ pcap_writer(PyObject *self, PyObject *args)
     const char * mode;
 
     if(!PyArg_ParseTuple(args, "ss", &filename, &mode)){
-        printf("Could not open file\n");
         PyErr_NoMemory(); // also retarded, lol
     }
 
