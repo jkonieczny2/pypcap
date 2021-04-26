@@ -1,6 +1,7 @@
 #include <pcap.h>
 #include "pypcap.h"
 #include "writer.h"
+#include "reader.h"
 
 /*
 Methods to create python objects
@@ -118,6 +119,8 @@ PyInit_pypcap(void)
     PyObject *m;
     if (PyType_Ready(&PcapWriterType) < 0)
         return NULL;
+    if (PyType_Ready(&PcapReaderType) < 0)
+        return NULL;
 
     m = PyModule_Create(&pypcap);
     if(m == NULL)
@@ -126,6 +129,13 @@ PyInit_pypcap(void)
     Py_INCREF(&PcapWriterType);
     if(PyModule_AddObject(m, "PcapWriter", (PyObject *) &PcapWriterType) < 0){
         Py_DECREF(&PcapWriterType);
+        Py_DECREF(m);
+        return NULL;
+    };
+
+    Py_INCREF(&PcapReaderType);
+    if(PyModule_AddObject(m, "PcapReader", (PyObject *) &PcapReaderType) < 0){
+        Py_DECREF(&PcapReaderType);
         Py_DECREF(m);
         return NULL;
     };
