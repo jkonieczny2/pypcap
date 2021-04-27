@@ -91,6 +91,24 @@ PcapReader_fileno(PcapReader *self, PyObject *Py_UNUSED(ignored))
     return PyLong_FromLong(fd);
 }
 
+/* read file */
+static PyObject *
+PcapReader_read(PcapReader *self, PyObject *Py_UNUSED(ignored))
+{
+    if(self->_pcap == NULL){
+        PyErr_SetString(PyExc_SystemError, "Cannot read from pcap reader. File is closed and/or there are no pcaps.");
+        return NULL;
+    }
+
+    long pcap_count = 0;
+    struct pcap_pkthdr pktHeader;
+    while(pcap_next(self->_pcap, &pktHeader)){
+        pcap_count++; // somehow this is fine with stdout, but not with an open PyFile obj
+    }
+
+    return PyLong_FromLong(pcap_count);
+}
+
 /* expose attributes as custom members */
 static PyMemberDef PcapReader_members[] = {
     {NULL}
@@ -100,6 +118,7 @@ static PyMemberDef PcapReader_members[] = {
 static PyMethodDef PcapReader_methods[] = {
     {"close", (PyCFunction) PcapReader_close, METH_NOARGS, "Close the object's file pointer"},
     {"fileno", (PyCFunction) PcapReader_fileno, METH_NOARGS, "Return file descriptor number of PcapReader object"},
+    {"read", (PyCFunction) PcapReader_read, METH_NOARGS, "Read pcap file"},
     {NULL}
 };
 

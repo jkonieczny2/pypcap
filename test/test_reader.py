@@ -5,7 +5,7 @@ import subprocess
 
 DEFAULT_MODE = 'rb'
 FILENAME = 'pcap_test.pcap'
-
+PACKET_COUNT = 764 # so happens that packet count was 764
 
 class TestWriter(unittest.TestCase):
     def setUp(self):
@@ -17,7 +17,8 @@ class TestWriter(unittest.TestCase):
         self.default_mode = DEFAULT_MODE
 
     def create_reader(self):
-        r = pypcap.PcapReader(open(self.f))
+        with open(self.f, 'rb') as fp:
+            r = pypcap.PcapReader(fp)
         return r
 
     def test_pcap_exists(self):
@@ -28,6 +29,10 @@ class TestWriter(unittest.TestCase):
         assert(isinstance(r.fileno(), int))
         assert(r.fileno() > 2)
         assert(not r.closed)
+
+    def test_count(self):
+        r = pypcap.PcapReader(open(self.f, 'rb'))
+        assert(r.read() == 764) # somehow this is returning 22.  why???
 
     def test_reader_close(self):
         r = self.create_reader()
@@ -56,3 +61,4 @@ class TestWriter(unittest.TestCase):
         fd = p_read.stdout.fileno()
         p_fd = reader.fileno()
         assert(fd == p_fd)
+        assert(reader.read() == PACKET_COUNT)
