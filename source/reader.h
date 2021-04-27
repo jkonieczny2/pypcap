@@ -8,11 +8,8 @@
 typedef struct{
     PyObject_HEAD
     /* type specific fields*/
-    const char *_filename;
-    const char *_mode;
+    PyObject *stream;
     char *_errbuf;
-    PyObject *filename;
-    PyObject *mode;
     FILE *fp;
     pcap_t *_pcap;
 } PcapReader;
@@ -23,19 +20,6 @@ PcapReader_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     PcapReader *self;
     self = (PcapReader *) type->tp_alloc(type,0);
-    if (self != NULL) {
-        /* init members to default, if desired */
-        self->filename = PyUnicode_FromString("");
-        if(self->filename == NULL) {
-            Py_DECREF(self);
-            return NULL;
-        }
-        self->mode = PyUnicode_FromString("wb");
-        if(self->mode == NULL){
-            Py_DECREF(self);
-            return NULL;
-        }
-    }
     return (PyObject *) self;
 }
 
@@ -43,29 +27,25 @@ PcapReader_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
 {
-    char *f;
-    const char m[] = "rb"; // for now, we only support wb mode
+    PyObject *stream;
 
-    static char *kwlist[] = {"filename", NULL};
-    PyObject *filename = NULL, *mode=NULL, *tmp;
+    static char *kwlist[] = {"stream", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &f)){
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &stream)){
         return -1;
     }
 
-    self->_filename = f;
-    self->_mode = m;
-
-    // create file pointer
-    FILE *fp;
-    if(!strcmp(f, "-")){
-        fp = fdopen(0, m);
-    } else{
-        fp = fopen(f, m);
+    int fd = PyObject_AsFileDescriptor(stream);
+    if(fd == -1){
+        PyErr_SetString(PyExc_ValueError, "Could not obtain file descriptor from passed object");
+        return -1;
     }
 
+    // create file pointer
+    FILE *fp = fdopen(fd, "rb"); //pcap reader always in rb mode
+
     if(fp == NULL){
-        PyErr_Format(PyExc_SystemError, "Could not open file '%s' for reading", self->_filename);
+        PyErr_SetString(PyExc_SystemError, "Could not open file object for reading");
         return -1;
     }
     self->fp = fp;
@@ -76,27 +56,10 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
     pcap_t *pcap = pcap_fopen_offline_with_tstamp_precision(fp, PCAP_TSTAMP_PRECISION_NANO, self->_errbuf);
 
     if(pcap == NULL){
-        PyErr_Format(PyExc_SystemError, "Could not create pcap reader for '%s': '%s'", self->_filename, self->_errbuf);
+        PyErr_SetString(PyExc_SystemError, "Could not create pcap reader for file object");
         return -1;
     }
     self->_pcap = pcap;
-
-    // set PyObject attributes
-    filename = PyUnicode_FromString(f);
-    if(filename){
-        tmp = self->filename;
-        Py_INCREF(filename);
-        self->filename = filename;
-        Py_DECREF(tmp);
-    }
-
-    mode = PyUnicode_FromString(m);
-    if(mode){
-        tmp = self->mode;
-        Py_INCREF(mode);
-        self->mode = mode;
-        Py_DECREF(tmp);
-    }
 
     return 0;
 }
@@ -120,7 +83,7 @@ static PyObject *
 PcapReader_fileno(PcapReader *self, PyObject *Py_UNUSED(ignored))
 {
     if(self->fp == NULL){
-        PyErr_Format(PyExc_SystemError, "Cannot obtain fileno for file '%s'; is already closed", self->_filename);
+        PyErr_SetString(PyExc_SystemError, "Cannot obtain fileno, file is already closed.");
         return NULL;
     }
 
@@ -140,51 +103,7 @@ static PyMethodDef PcapReader_methods[] = {
     {NULL}
 };
 
-/* custom getter/setter methods to control member types */
-static PyObject *
-PcapReader_get_filename(PcapReader *self, void *closure)
-{
-    Py_INCREF(self->filename);
-    return self->filename;
-}
-
-static int PcapReader_set_filename(PcapReader *self, PyObject *value, void *closure)
-{
-    PyErr_SetString(PyExc_TypeError, "filename attribute can only be set on initialization");
-    return -1;
-
-    PyObject *tmp;
-
-    /* prevent people from making attribute pointer NULL */
-    if(value == NULL) {
-        PyErr_SetString(PyExc_TypeError, "Cannot delete filename attribute");
-        return -1; 
-    }   
-
-    if(!PyUnicode_Check(value)) {
-        PyErr_SetString(PyExc_TypeError, "filename attribute must be a string");
-        return -1; 
-    }   
-    tmp = self->filename;
-    Py_INCREF(value);
-    self->filename = value;
-    Py_DECREF(tmp);
-    return 0;
-}
-
-static PyObject *
-PcapReader_get_mode(PcapReader *self, void *closure)
-{
-    Py_INCREF(self->mode);
-    return self->mode;
-}
-
-static int PcapReader_set_mode(PcapReader *self, PyObject *value, void *closure)
-{
-    PyErr_SetString(PyExc_TypeError, "mode attribute can only be set on initialization");
-    return -1;
-}
-
+/* getters and setters */
 static PyObject *
 PcapReader_get_closed(PcapReader *self, PyObject *value, void *closure)
 {
@@ -198,10 +117,23 @@ static int PcapReader_set_closed(PcapReader *self, PyObject *value, void *closur
     return -1;
 }
 
+static PyObject *
+PcapReader_get_stream(PcapReader *self, PyObject *value, void *closure)
+{
+    Py_INCREF(self->stream);
+    return self->stream;
+}
+
+static int
+PcapReader_set_stream(PcapWriter *self, PyObject *value, void *closure)
+{
+    PyErr_SetString(PyExc_AttributeError, "stream attribute is read-only");
+    return -1;
+}
+
 static PyGetSetDef PcapReader_getsetters[] = { 
-    {"filename", (getter) PcapReader_get_filename, (setter) PcapReader_set_filename, "filename", NULL},
-    {"mode", (getter) PcapReader_get_mode, (setter) PcapReader_set_mode, "mode", NULL},
     {"closed", (getter) PcapReader_get_closed, (setter) PcapReader_set_closed, "closed", NULL},
+    {"stream", (getter) PcapReader_get_stream, (setter) PcapReader_set_stream, "stream", NULL},
     {NULL}
 };
 
@@ -209,16 +141,14 @@ static PyGetSetDef PcapReader_getsetters[] = {
 static int
 PcapReader_traverse(PcapReader *self, visitproc visit, void *arg)
 {
-    Py_VISIT(self->filename);
-    Py_VISIT(self->mode);
+    Py_VISIT(self->stream);
     return 0;
 }
 
 static int
 PcapReader_clear(PcapReader *self)
 {
-    Py_CLEAR(self->filename);
-    Py_CLEAR(self->mode);
+    Py_CLEAR(self->stream);
     return 0;
 }
 
