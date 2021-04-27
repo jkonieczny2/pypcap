@@ -1,6 +1,7 @@
 import pypcap
 import unittest
 import os
+import subprocess
 
 DEFAULT_MODE = 'rb'
 FILENAME = 'pcap_test.pcap'
@@ -38,3 +39,20 @@ class TestWriter(unittest.TestCase):
             r = self.create_reader()
             r.closed = False
         self.assertRaises(AttributeError, set_closed)
+
+    def test_subprocess(self):
+        """
+        Whole reason i am doing this
+        So that the pcap reader can read from stdout
+        """
+        cmd = [
+            'cat',
+            self.f
+        ]
+
+        p_read = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        reader = pypcap.PcapReader(p_read.stdout)
+
+        fd = p_read.stdout.fileno()
+        p_fd = reader.fileno()
+        assert(fd == p_fd)
