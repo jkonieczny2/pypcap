@@ -4,6 +4,7 @@
 #include <string.h>
 #include <structmember.h>
 #include <pcap.h>
+#include <errno.h>
 
 typedef struct{
     PyObject_HEAD
@@ -27,7 +28,7 @@ PcapReader_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *stream;
+    PyObject *stream=NULL, *tmp;
 
     static char *kwlist[] = {"stream", NULL};
 
@@ -43,7 +44,16 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
 
     // create file pointer
     FILE *fp = fdopen(fd, "rb"); //pcap reader always in rb mode
+/*
+    I think the problem here is that
+    the original stream has an fd of 3
+    and so is our own fp
+    but Python throws out the original stream object
+    so the FD is closed and life sucks
 
+    I think the play is, figure out how to correctly INCREF the stream object
+    then the file will stay open and I can actually use self->fp later
+*/
     if(fp == NULL){
         PyErr_SetString(PyExc_SystemError, "Could not open file object for reading");
         return -1;
@@ -60,6 +70,13 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
         return -1;
     }
     self->_pcap = pcap;
+
+    if(stream){
+//        tmp = self->stream;
+        Py_INCREF(stream);
+        self->stream = stream;
+//        Py_DECREF(tmp); // getter/setter ensure this is never NULL, so no need to use XDECREF
+    }
 
     return 0;
 }
@@ -96,15 +113,16 @@ static PyObject *
 PcapReader_read(PcapReader *self, PyObject *Py_UNUSED(ignored))
 {
     if(self->_pcap == NULL){
-        PyErr_SetString(PyExc_SystemError, "Cannot read from pcap reader. File is closed and/or there are no pcaps.");
+        PyErr_SetString(PyExc_SystemError, "Cannot read; pcap reader is already closed.");
         return NULL;
-    }
+    }   
 
     long pcap_count = 0;
     struct pcap_pkthdr pktHeader;
+
     while(pcap_next(self->_pcap, &pktHeader)){
         pcap_count++; // somehow this is fine with stdout, but not with an open PyFile obj
-    }
+    }   
 
     return PyLong_FromLong(pcap_count);
 }
@@ -176,8 +194,11 @@ static void
 PcapReader_dealloc(PcapReader *self)
 {
     /* close the pcap pointer */
-    if(self->_pcap != NULL)
+    if(self->_pcap != NULL){
         pcap_close(self->_pcap);
+        self->_pcap = NULL;
+        self->fp = NULL;
+    }
 
     /* dealloc with cyclic GC check */
     PyObject_GC_UnTrack(self);
