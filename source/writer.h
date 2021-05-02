@@ -107,14 +107,14 @@ PcapWriter_write(PcapWriter *self, PyObject *args)
 
 /* write from PcapReader */
 static PyObject *
-PcapWriter_write_from_file(PcapWriter *self, PyObject *args){
+PcapWriter_write_from_pcap_reader(PcapWriter *self, PyObject *args){
     if(self->fp == NULL)
         return PyErr_Format(PyExc_SystemError, "Cannot perform write operation on closed file");
 
     // obtain PcapReader argument
     PcapReader *pcap_reader;
     if(!PyArg_ParseTuple(args, "O", &pcap_reader)){
-        PyErr_SetString(PyExc_ValueError, "write_from_file method requires a PcapReader argument");
+        PyErr_SetString(PyExc_ValueError, "write_from_pcap_reader method requires a PcapReader argument");
         return NULL;
     }
     // TODO: check that pcap_reader is a PcapReader object
@@ -176,7 +176,7 @@ static PyMemberDef PcapWriter_members[] = {
 static PyMethodDef PcapWriter_methods[] = {
     {"close", (PyCFunction) PcapWriter_close, METH_NOARGS, "Close the object's file pointer"},
     {"write", (PyCFunction) PcapWriter_write, METH_VARARGS, "Write PyBytes object to file"},
-    {"write_from_file", (PyCFunction) PcapWriter_write_from_file, METH_VARARGS, "Write a PcapReader object to file"},
+    {"write_from_pcap_reader", (PyCFunction) PcapWriter_write_from_pcap_reader, METH_VARARGS, "Write a PcapReader object to file"},
     {"fileno", (PyCFunction) PcapWriter_fileno, METH_VARARGS, "Get file descriptor attached to open file"},
     {NULL}
 };

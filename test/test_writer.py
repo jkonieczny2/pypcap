@@ -62,7 +62,7 @@ class TestWriter(unittest.TestCase):
 #        read = open(self.f, 'rb').read()
 #        assert(read == txt)
 
-    def test_write_from_file(self, debug=False):
+    def test_write_from_pcap_reader(self, debug=False):
         if not debug:
             writer = self.create_writer()
         else:
@@ -71,7 +71,7 @@ class TestWriter(unittest.TestCase):
 
         reader = self.create_reader()
 
-        res = writer.write_from_file(reader)
+        res = writer.write_from_pcap_reader(reader)
         assert(res == self.exp_count)
 
         # check file contents
@@ -87,11 +87,11 @@ class TestWriter(unittest.TestCase):
         writer = self.create_writer()
         reader = self.create_reader()
 
-        res = writer.write_from_file(reader)
+        res = writer.write_from_pcap_reader(reader)
 
         reader.close()
         reader = self.create_reader()
-        res2 = writer.write_from_file(reader)
+        res2 = writer.write_from_pcap_reader(reader)
 
         writer.close()
         final = pypcap.PcapReader(open(self.f, 'rb'))
@@ -116,6 +116,6 @@ class TestWriter(unittest.TestCase):
         assert(fd == p_fd)
 
         writer = self.create_writer()
-        res = writer.write_from_file(reader)
+        res = writer.write_from_pcap_reader(reader)
 
         assert(res == self.exp_count)
