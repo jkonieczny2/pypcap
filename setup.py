@@ -2,7 +2,10 @@ from distutils.core import setup, Extension
 
 pypcap = Extension(
     'pypcap',
-    sources=['source/pypcap.c'],
+    sources=[
+        'source/pypcap.c',
+        'source/util.c',
+    ],
     libraries=['pcap'],
 )
 
