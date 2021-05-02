@@ -119,3 +119,11 @@ class TestWriter(unittest.TestCase):
         res = writer.write_from_pcap_reader(reader)
 
         assert(res == self.exp_count)
+
+    def test_open_in_w_mode(self):
+        def open_w():
+            fp = open(self.f, 'w')
+            writer = pypcap.PcapWriter(fp)
+
+        self.assertRaises(AttributeError, open_w)
+

@@ -9,6 +9,35 @@
 #define LINKTYPE_ETHERNET 1
 #define MAX_PACKET_SIZE 65536
 
+/* utility method to get strings out of PyUnicode objects */
+char *
+PyUnicode_ToString(PyObject *obj){
+    Py_XINCREF(obj);
+
+    if(!PyUnicode_Check(obj)){
+        PyErr_SetString(PyExc_AttributeError, "Cannot obtain a char * from a non-PyUnicode object");
+        return NULL;
+    }
+
+    PyObject *ascii_string = PyUnicode_AsASCIIString(obj);
+    if(ascii_string == NULL){
+        PyErr_SetString(PyExc_AttributeError, "PyUnicode object could not be converted to ASCII");
+        return NULL;
+    }
+
+    char *c_str = PyBytes_AsString(ascii_string);
+    if(c_str == NULL){
+        PyErr_SetString(PyExc_AttributeError, "Error converting PyBytes object to c string");
+        return NULL;
+    }
+
+    // clean up references, not 100% sure if this is necessary
+    Py_DECREF(obj);
+    Py_DECREF(ascii_string);
+
+    return c_str;
+}
+
 typedef struct{
     PyObject_HEAD
     /* type specific fields*/    
@@ -38,6 +67,18 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
+    // check stream is in wb mode
+    PyObject *mode = PyObject_GetAttrString(stream, "mode");
+    if(mode == NULL){
+        PyErr_SetString(PyExc_AttributeError, "Object passed to PcapWriter must have a 'mode' attribute");
+        return -1;
+    }
+    char *c_mode = PyUnicode_ToString(mode);
+    if(strcmp(c_mode, "wb") != 0){
+        PyErr_SetString(PyExc_AttributeError, "File object passed to PcapWriter must be opened in 'wb' mode");
+        return -1;
+    }    
+    
     // create file pointer
     int fd = PyObject_AsFileDescriptor(stream);
     FILE *fp = fdopen(fd, "wb");
