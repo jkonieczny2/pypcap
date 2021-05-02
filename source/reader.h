@@ -44,16 +44,6 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
 
     // create file pointer
     FILE *fp = fdopen(fd, "rb"); //pcap reader always in rb mode
-/*
-    I think the problem here is that
-    the original stream has an fd of 3
-    and so is our own fp
-    but Python throws out the original stream object
-    so the FD is closed and life sucks
-
-    I think the play is, figure out how to correctly INCREF the stream object
-    then the file will stay open and I can actually use self->fp later
-*/
     if(fp == NULL){
         PyErr_SetString(PyExc_SystemError, "Could not open file object for reading");
         return -1;
@@ -71,18 +61,19 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
     }
     self->_pcap = pcap;
 
+    // Set PyObject attributes
     if(stream){
-//        tmp = self->stream;
+        tmp = self->stream;
         Py_INCREF(stream);
         self->stream = stream;
-//        Py_DECREF(tmp); // getter/setter ensure this is never NULL, so no need to use XDECREF
+        Py_XDECREF(tmp); // didn't set this to default in _new, so need XDECREF
     }
 
     return 0;
 }
 
 /* close method */
-static PyObject * // cannot return 0 for a Py C function, lol
+static PyObject *
 PcapReader_close(PcapReader *self, PyObject *Py_UNUSED(ignored))
 {
     if(self->fp == NULL)
@@ -223,7 +214,6 @@ static PyTypeObject PcapReaderType = {
     .tp_basicsize = sizeof(PcapReader),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
-//    .tp_new = PyType_GenericNew, // don't really need custom tp_new
     .tp_new = PcapReader_new,
     .tp_dealloc = (destructor) PcapReader_dealloc,
     .tp_init = (initproc) PcapReader_init,
