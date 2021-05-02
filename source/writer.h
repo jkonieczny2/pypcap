@@ -4,6 +4,7 @@
 #include <string.h>
 #include <structmember.h>
 #include <stdio.h>
+#include "reader.h"
 
 #define LINKTYPE_ETHERNET 1
 #define MAX_PACKET_SIZE 65536
@@ -104,6 +105,40 @@ PcapWriter_write(PcapWriter *self, PyObject *args)
     return PyLong_FromSsize_t(size);
 }
 
+/* write from PcapReader */
+static PyObject *
+PcapWriter_write_from_file(PcapWriter *self, PyObject *args){
+    if(self->fp == NULL)
+        return PyErr_Format(PyExc_SystemError, "Cannot perform write operation on closed file");
+
+    // obtain PcapReader argument
+    PcapReader *pcap_reader;
+    if(!PyArg_ParseTuple(args, "O", &pcap_reader)){
+        PyErr_SetString(PyExc_ValueError, "write_from_file method requires a PcapReader argument");
+        return NULL;
+    }
+    // TODO: check that pcap_reader is a PcapReader object
+    Py_INCREF(pcap_reader);
+
+    // copy reader to writer
+    pcap_t *pcap = pcap_reader->_pcap;
+    if(pcap == NULL){
+        PyErr_SetString(PyExc_SystemError, "PcapReader object is not open for reading");
+        return NULL;
+    }
+
+    struct pcap_pkthdr pkt_header;
+    const uint8_t *packetData;
+    long pkt_count = 0;
+
+    while((packetData = pcap_next(pcap, &pkt_header))){
+        pcap_dump((uint8_t *)self->_pcap_dumper, &pkt_header, packetData);
+        pkt_count++;
+    }
+
+    return PyLong_FromLong(pkt_count);
+}
+
 /* fileno of open file */
 static PyObject *
 PcapWriter_fileno(PcapWriter *self, PyObject *Py_UNUSED(ignored))
@@ -141,6 +176,7 @@ static PyMemberDef PcapWriter_members[] = {
 static PyMethodDef PcapWriter_methods[] = {
     {"close", (PyCFunction) PcapWriter_close, METH_NOARGS, "Close the object's file pointer"},
     {"write", (PyCFunction) PcapWriter_write, METH_VARARGS, "Write PyBytes object to file"},
+    {"write_from_file", (PyCFunction) PcapWriter_write_from_file, METH_VARARGS, "Write a PcapReader object to file"},
     {"fileno", (PyCFunction) PcapWriter_fileno, METH_VARARGS, "Get file descriptor attached to open file"},
     {NULL}
 };

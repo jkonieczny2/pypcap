@@ -120,6 +120,7 @@ PcapReader_read(PcapReader *self, PyObject *Py_UNUSED(ignored))
 
 /* expose attributes as custom members */
 static PyMemberDef PcapReader_members[] = {
+    {"_pcap", T_OBJECT_EX, offsetof(PcapReader, _pcap), 0, "pcap_t *pcap pointer"},
     {NULL}
 };
 
@@ -153,7 +154,7 @@ PcapReader_get_stream(PcapReader *self, PyObject *value, void *closure)
 }
 
 static int
-PcapReader_set_stream(PcapWriter *self, void *closure)
+PcapReader_set_stream(PcapReader *self, void *closure)
 {
     PyErr_SetString(PyExc_AttributeError, "stream attribute is read-only");
     return -1;

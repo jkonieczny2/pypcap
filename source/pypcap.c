@@ -1,7 +1,7 @@
 #include <pcap.h>
 #include "pypcap.h"
 #include "writer.h"
-#include "reader.h"
+//#include "reader.h" //included this already in writer.h; figure out how ifndef works
 
 /*
 Methods to create python objects
