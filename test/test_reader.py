@@ -62,3 +62,10 @@ class TestWriter(unittest.TestCase):
         p_fd = reader.fileno()
         assert(fd == p_fd)
         assert(reader.read() == PACKET_COUNT)
+
+    def test_open_in_r_mode(self):
+        def open_r():
+            fp = open(self.f, 'r')
+            reader = pypcap.PcapReader(fp)
+        self.assertRaises(AttributeError, open_r)
+

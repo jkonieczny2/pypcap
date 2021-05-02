@@ -5,6 +5,7 @@
 #include <structmember.h>
 #include <pcap.h>
 #include <errno.h>
+#include "util.h"
 
 typedef struct{
     PyObject_HEAD
@@ -40,6 +41,18 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
     if(fd == -1){
         PyErr_SetString(PyExc_ValueError, "Could not obtain file descriptor from passed object");
         return -1;
+    }
+
+    // check stream is in rb mode
+    PyObject *mode = PyObject_GetAttrString(stream, "mode");
+    if(mode == NULL){
+        PyErr_SetString(PyExc_AttributeError, "Object passed to PcapReader must have a 'mode' attribute");
+        return -1; 
+    }   
+    char *c_mode = PyUnicode_ToString(mode);
+    if(strcmp(c_mode, "rb") != 0){ 
+        PyErr_SetString(PyExc_AttributeError, "File object passed to PcapReader must be opened in 'rb' mode");
+        return -1; 
     }
 
     // create file pointer
