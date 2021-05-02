@@ -133,7 +133,7 @@ static PyMethodDef PcapReader_methods[] = {
 
 /* getters and setters */
 static PyObject *
-PcapReader_get_closed(PcapReader *self, PyObject *value, void *closure)
+PcapReader_get_closed(PcapReader *self, void *closure)
 {
     int _closed = (self->fp == NULL);
     return PyBool_FromLong((long) _closed); // we don't incref because creation implies refcount=1
@@ -153,7 +153,7 @@ PcapReader_get_stream(PcapReader *self, PyObject *value, void *closure)
 }
 
 static int
-PcapReader_set_stream(PcapWriter *self, PyObject *value, void *closure)
+PcapReader_set_stream(PcapWriter *self, void *closure)
 {
     PyErr_SetString(PyExc_AttributeError, "stream attribute is read-only");
     return -1;
