@@ -5,11 +5,16 @@
 #include <structmember.h>
 #include <stdio.h>
 
+#define LINKTYPE_ETHERNET 1
+#define MAX_PACKET_SIZE 65536
+
 typedef struct{
     PyObject_HEAD
     /* type specific fields*/    
     FILE *fp;
     PyObject *stream;
+    pcap_t *_pcap;
+    pcap_dumper_t *_pcap_dumper;
 } PcapWriter;
 
 /* creation method */
@@ -40,6 +45,25 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
         return -1;
     }
     self->fp = fp;
+
+    // create pcap writer
+    pcap_t *pcap;
+    pcap_dumper_t *pcap_dumper;
+    pcap = pcap_open_dead_with_tstamp_precision(LINKTYPE_ETHERNET, MAX_PACKET_SIZE, PCAP_TSTAMP_PRECISION_NANO);
+
+    if(pcap == NULL){
+        PyErr_SetString(PyExc_SystemError, "Could not open pcap object for writing");
+        return -1;
+    }
+    self->_pcap = pcap;
+
+    // create pcap dumper
+    pcap_dumper = pcap_dump_fopen(pcap, self->fp);
+    if(pcap_dumper == NULL){
+        PyErr_SetString(PyExc_SystemError, "Could not create pcap file writer");
+        return -1;
+    }
+    self->_pcap_dumper = pcap_dumper;
 
     // set pyobject attributes
     if(stream){
@@ -97,16 +121,14 @@ PcapWriter_fileno(PcapWriter *self, PyObject *Py_UNUSED(ignored))
 static PyObject *
 PcapWriter_close(PcapWriter *self, PyObject *Py_UNUSED(ignored))
 {
-    if(self->fp == NULL)
+    if(self->_pcap_dumper == NULL)
         return Py_BuildValue("");
 
-    int i = fclose(self->fp);
-    if(i !=0 ){
-        PyErr_SetString(PyExc_SystemError, "Error closing file");
-        return NULL;
-    }
-
+    pcap_dump_close(self->_pcap_dumper);
+    self->_pcap_dumper = NULL;
+    self->_pcap = NULL;
     self->fp = NULL;
+
     return Py_BuildValue(""); // return None
 }
 
