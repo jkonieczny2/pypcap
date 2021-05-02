@@ -18,7 +18,8 @@ PyObject *Py_Build_Interface(pcap_if_t *iface){
     );
 
     if (iface_dict == NULL){
-        PyErr_NoMemory(); //lol
+        PyErr_SetString(PyExc_ValueError, "Error retrieving interface definintions");
+        return NULL;
     }
 
     return iface_dict;
@@ -58,40 +59,11 @@ find_all_devs(PyObject *self, PyObject *args)
     return iface_dict;
 };
 
-static PyObject *
-pcap_writer(PyObject *self, PyObject *args)
-{
-    const char * filename;
-    const char * mode;
-
-    if(!PyArg_ParseTuple(args, "ss", &filename, &mode)){
-        PyErr_NoMemory(); // also retarded, lol
-    }
-
-    // create file descriptor
-    FILE *fp = fopen(filename, mode);
-    if(fp == NULL){
-        printf("Could not open file %s\n", filename);
-        PyErr_NoMemory(); // retarded, lol
-    }
-    int fd = fileno(fp);
-
-    // return Py file obj
-    PyObject *fobj = PyFile_FromFd(fd, filename, mode, -1, NULL, NULL, NULL, 1); // PyFile_FromFile died in 2.7
-    if(fobj == NULL){
-        printf("Could not create python file obj\n");
-        PyErr_NoMemory(); // this is retarded but fine for now
-    }
-
-    return fobj;
-}
-
 /*
-Define methods in the module
+Define module-level methods
 */
 static PyMethodDef PyPcapMethods[] = {
     {"find_all_devs" , find_all_devs, METH_VARARGS, "List all network devices on the system"},
-    {"pcap_writer", pcap_writer, METH_VARARGS, "Open a file for writing pcaps"},
     {NULL, NULL, 0, NULL}
 };
 
