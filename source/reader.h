@@ -50,6 +50,10 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
         return -1; 
     }   
     char *c_mode = PyUnicode_ToString(mode);
+    if(c_mode == NULL){
+        PyErr_SetString(PyExc_AttributeError, "Could not convert file object's mode to a c string");
+        return -1;
+    }
     if(strcmp(c_mode, "rb") != 0){ 
         PyErr_SetString(PyExc_AttributeError, "File object passed to PcapReader must be opened in 'rb' mode");
         return -1; 

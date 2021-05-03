@@ -46,6 +46,10 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
         return -1;
     }
     char *c_mode = PyUnicode_ToString(mode);
+    if(c_mode == NULL){
+        PyErr_SetString(PyExc_AttributeError, "Could not convert file object's mode to a c string");
+        return -1;
+    }
     if(strcmp(c_mode, "wb") != 0){
         PyErr_SetString(PyExc_AttributeError, "File object passed to PcapWriter must be opened in 'wb' mode");
         return -1;
