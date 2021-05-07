@@ -1,3 +1,4 @@
 build
 test/__pycache__
 *.swp
+test/perf_test
