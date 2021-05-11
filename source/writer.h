@@ -57,14 +57,7 @@ PcapWriter_init(PcapWriter *self, PyObject *args, PyObject *kwds)
     
     // create file pointer
     int fd = PyObject_AsFileDescriptor(stream);
-    int fd_new = dup(fd);
-
-    if(fd_new == -1){
-        PyErr_SetString(PyExc_SystemError, "Could not duplicate file descriptor from passed file object");
-        return -1;
-    }
-
-    FILE *fp = fdopen(fd_new, "wb");
+    FILE *fp = fdopen(fd, "wb");
     if(fp == NULL){
         PyErr_SetString(PyExc_SystemError, "Could not open file object for writing");
         return -1;
@@ -228,7 +221,7 @@ PcapWriter_get_stream(PcapWriter *self, void *closure){
 
 static int
 PcapWriter_set_stream(PcapWriter *self, PyObject *value, void *closure){
-    PyErr_SetString(PyExc_AttributeError, "stream attribute is read-only");
+    PyErr_SetString(PyExc_AttributeError, "closed attribute is read-only");
     return -1;
 }
 

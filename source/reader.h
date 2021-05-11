@@ -60,14 +60,7 @@ PcapReader_init(PcapReader *self, PyObject *args, PyObject *kwds)
     }
 
     // create file pointer
-    int fd_new = dup(fd);
-
-    if(fd_new == -1){
-        PyErr_SetString(PyExc_SystemError, "Could not duplicate file descriptor from passed file object");
-        return -1;
-    }
-
-    FILE *fp = fdopen(fd_new, "rb"); //pcap reader always in rb mode
+    FILE *fp = fdopen(fd, "rb"); //pcap reader always in rb mode
     if(fp == NULL){
         PyErr_SetString(PyExc_SystemError, "Could not open file object for reading");
         return -1;
