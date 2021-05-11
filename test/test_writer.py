@@ -113,7 +113,6 @@ class TestWriter(unittest.TestCase):
 
         fd = p_read.stdout.fileno()
         p_fd = reader.fileno()
-        assert(fd == p_fd)
 
         writer = self.create_writer()
         res = writer.write_from_pcap_reader(reader)
