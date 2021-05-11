@@ -127,3 +127,8 @@ class TestWriter(unittest.TestCase):
 
         self.assertRaises(AttributeError, open_w)
 
+    def test_context(self):
+        with open(self.f, 'wb') as fh:
+            writer = pypcap.PcapWriter(fh)
+            writer.close()
+
