@@ -8,14 +8,119 @@ Methods to create python objects
 */
 
 /*
+Return number of items in a linked list of pcap_addr_t
+*/
+Py_ssize_t len_addresses(pcap_addr_t *addr){
+    Py_ssize_t count = 0;
+    while(addr != NULL){
+        count++;
+        addr = addr->next;
+    }
+    return count;
+}
+
+/*
+Return a PyDict representing a struct sockaddr
+*/
+PyObject *Py_Build_Sockaddr(struct sockaddr *sockaddr){
+    PyObject *sockaddr_dict = Py_BuildValue(
+        "{s:i, s:s}",
+        "sa_family", sockaddr->sa_family,
+        "sa_data", sockaddr->sa_data
+    );
+
+    char *address_type = af_to_string(sockaddr->sa_family);
+    PyObject *py_addr_type = Py_BuildValue("s", address_type);
+    PyDict_SetItemString(sockaddr_dict, "address_family", py_addr_type);
+
+    if(sockaddr->sa_family == AF_INET){
+        char *inet_addr = sockaddr_to_inet_addr(sockaddr);
+        PyDict_SetItemString(sockaddr_dict, "ipv4_address", Py_BuildValue("s", inet_addr));
+
+        uint16_t port = sockaddr_to_port(sockaddr);
+        PyDict_SetItemString(sockaddr_dict, "port", Py_BuildValue("l", port));
+    }
+
+    if(sockaddr_dict == NULL){
+        PyErr_SetString(PyExc_ValueError, "Error retrieving sockaddr information");
+        return NULL;
+    }
+    return sockaddr_dict;
+}
+
+/*
+Return a PyDict representing a pcap_addr_t
+*/
+PyObject *Py_Build_Addr(pcap_addr_t *addr){
+    PyObject *addr_dict = PyDict_New();
+    if(addr_dict == NULL){
+        PyErr_NoMemory();
+    }
+
+    // addr
+    PyObject *py_addr = Py_Build_Sockaddr(addr->addr);
+    PyDict_SetItemString(addr_dict, "addr", py_addr);
+
+    // netmask
+    if(addr->netmask != NULL){
+        PyObject *nmask = Py_Build_Sockaddr(addr->netmask);
+        PyDict_SetItemString(addr_dict, "netmask", nmask);
+    }
+
+    // broadaddr
+    if(addr->broadaddr != NULL){
+        PyObject *nmask = Py_Build_Sockaddr(addr->broadaddr);
+        PyDict_SetItemString(addr_dict, "broadaddr", nmask);
+    }
+
+    // dstaddr
+    if(addr->dstaddr != NULL){
+        PyObject *nmask = Py_Build_Sockaddr(addr->dstaddr);
+        PyDict_SetItemString(addr_dict, "dstaddr", nmask);
+    }
+
+    if(addr_dict == NULL){
+        PyErr_SetString(PyExc_ValueError, "Error retrieving pcap_addr_t information");
+        return NULL;
+    }
+
+    return addr_dict;
+}
+
+/*
 Return a PyDict containing interface details
 */
 PyObject *Py_Build_Interface(pcap_if_t *iface){
     PyObject *iface_dict = Py_BuildValue(
-        "{s:s, s:s}",
+        "{s:s, s:s, s:i}",
         "name", iface->name,
-        "description", iface->description
+        "description", iface->description,
+        "flags", iface->flags
     );
+
+    // Build address information
+    int len_addrs = len_addresses(iface->addresses);
+    PyObject *addr_list = PyList_New(len_addrs);
+    if(addr_list == NULL){
+        PyErr_SetString(PyExc_ValueError, "Error initializing pcap_addr_t list");
+        return NULL;
+    }
+    pcap_addr_t *addr = iface->addresses;
+    for(Py_ssize_t i=0; i<len_addrs; i++){
+        PyObject *py_addr = Py_Build_Addr(addr);
+        if(py_addr == NULL){ // is this redundant since i'm already doing it in the function?
+            PyErr_SetString(PyExc_ValueError, "Error retrieving pcap_addr_t information");
+            return NULL;
+        }
+        PyList_SetItem(addr_list, i, py_addr);
+        addr = addr->next;
+    }
+
+    int addr_set = PyDict_SetItemString(iface_dict, "addresses", addr_list);
+    if(addr_set == -1){
+        PyErr_SetString(PyExc_ValueError, "Could not set 'addresses' value in interface dict");
+        return NULL;
+    }
 
     if (iface_dict == NULL){
         PyErr_SetString(PyExc_ValueError, "Error retrieving interface definintions");
@@ -36,11 +141,13 @@ find_all_devs(PyObject *self, PyObject *args)
     pcap_if_t *iface = malloc(sizeof(pcap_if_t));
     if(iface == 0){
         PyErr_NoMemory();
+        return NULL;
     }
     int res = pcap_findalldevs(&iface, errbuf);
 
     if(res == -1){
-        return PyUnicode_FromString(errbuf);
+        PyErr_SetString(PyExc_SystemError, errbuf);
+        return NULL;
     }
 
     // build dict of interface details

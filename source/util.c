@@ -1,4 +1,33 @@
+#include <arpa/inet.h>
 #include "util.h"
+
+uint16_t sockaddr_to_port(struct sockaddr *sockaddr){
+    struct sockaddr_in *sock_in = (struct sockaddr_in *) &sockaddr;
+    in_port_t port = sock_in->sin_port;
+    return (uint16_t)port;
+}
+
+char *sockaddr_to_inet_addr(struct sockaddr *sockaddr){
+    struct sockaddr_in *sock_in = (struct sockaddr_in *) &sockaddr;
+    char *ip = inet_ntoa(sock_in->sin_addr);
+    return ip;
+}
+
+char *af_to_string(int domain){
+    if(domain == AF_INET){
+        return "IPV4";
+    } else if(domain == AF_INET6){
+        return "IPV6";
+    } else if(domain == AF_UNIX){
+        return "UNIX";
+    } else if(domain == AF_UNSPEC){
+        return "UNSPECIFIED";
+    } else if(domain == AF_LOCAL){
+        return "LOCAL";
+    } else{
+        return "UNKNOWN";
+    }
+}
 
 /* utility method to get strings out of PyUnicode objects */
 char *
