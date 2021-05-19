@@ -23,22 +23,26 @@ Py_ssize_t len_addresses(pcap_addr_t *addr){
 Return a PyDict representing a struct sockaddr
 */
 PyObject *Py_Build_Sockaddr(struct sockaddr *sockaddr){
-    PyObject *sockaddr_dict = Py_BuildValue(
-        "{s:i, s:s}",
-        "sa_family", sockaddr->sa_family,
-        "sa_data", sockaddr->sa_data
-    );
+    PyObject *sockaddr_dict = PyDict_New();
+    if(sockaddr_dict == NULL){
+        PyErr_NoMemory();
+    }
 
+    // address family
     char *address_type = af_to_string(sockaddr->sa_family);
     PyObject *py_addr_type = Py_BuildValue("s", address_type);
+    if(py_addr_type == NULL){
+        PyErr_NoMemory();
+    }
     PyDict_SetItemString(sockaddr_dict, "address_family", py_addr_type);
 
-    if(sockaddr->sa_family == AF_INET){
-        char *inet_addr = sockaddr_to_inet_addr(sockaddr);
-        PyDict_SetItemString(sockaddr_dict, "ipv4_address", Py_BuildValue("s", inet_addr));
+    // inet addr of socket
+    char host[NI_MAXHOST];
+    int s = sockaddr_addr(sockaddr, host);
 
-        uint16_t port = sockaddr_to_port(sockaddr);
-        PyDict_SetItemString(sockaddr_dict, "port", Py_BuildValue("l", port));
+    if(s==0){
+        PyObject *py_addr = Py_BuildValue("s", host);
+        PyDict_SetItemString(sockaddr_dict, "address", py_addr);
     }
 
     if(sockaddr_dict == NULL){
@@ -62,6 +66,8 @@ PyObject *Py_Build_Addr(pcap_addr_t *addr){
     PyDict_SetItemString(addr_dict, "addr", py_addr);
 
     // netmask
+    // TODO: pass this directly to Py_Build_Sockaddr
+    //       that way we get a more compact dict
     if(addr->netmask != NULL){
         PyObject *nmask = Py_Build_Sockaddr(addr->netmask);
         PyDict_SetItemString(addr_dict, "netmask", nmask);

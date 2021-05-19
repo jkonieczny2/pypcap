@@ -1,17 +1,7 @@
 #include <arpa/inet.h>
 #include "util.h"
-
-uint16_t sockaddr_to_port(struct sockaddr *sockaddr){
-    struct sockaddr_in *sock_in = (struct sockaddr_in *) &sockaddr;
-    in_port_t port = sock_in->sin_port;
-    return (uint16_t)port;
-}
-
-char *sockaddr_to_inet_addr(struct sockaddr *sockaddr){
-    struct sockaddr_in *sock_in = (struct sockaddr_in *) &sockaddr;
-    char *ip = inet_ntoa(sock_in->sin_addr);
-    return ip;
-}
+#include <netdb.h>
+#include <sys/socket.h>
 
 char *af_to_string(int domain){
     if(domain == AF_INET){
@@ -27,6 +17,26 @@ char *af_to_string(int domain){
     } else{
         return "UNKNOWN";
     }
+}
+
+/*
+Modify the char *host passed into the function
+
+Return 0 on success, -1 on failure
+*/
+int sockaddr_addr(struct sockaddr *sockaddr, char *host){
+    int s = -1;
+
+    if(sockaddr->sa_family == AF_INET || sockaddr->sa_family == AF_INET6){
+        s = getnameinfo(
+            sockaddr,
+            (sockaddr->sa_family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6),
+            host, NI_MAXHOST,
+            NULL, 0, NI_NUMERICHOST
+        );
+    }
+
+    return s;
 }
 
 /* utility method to get strings out of PyUnicode objects */
