@@ -20,36 +20,24 @@ Py_ssize_t len_addresses(pcap_addr_t *addr){
 }
 
 /*
-Return a PyDict representing a struct sockaddr
+Return a PyObject string representing inet addr of sockaddr
 */
-PyObject *Py_Build_Sockaddr(struct sockaddr *sockaddr){
-    PyObject *sockaddr_dict = PyDict_New();
-    if(sockaddr_dict == NULL){
-        PyErr_NoMemory();
-    }
-
-    // address family
-    char *address_type = af_to_string(sockaddr->sa_family);
-    PyObject *py_addr_type = Py_BuildValue("s", address_type);
-    if(py_addr_type == NULL){
-        PyErr_NoMemory();
-    }
-    PyDict_SetItemString(sockaddr_dict, "address_family", py_addr_type);
-
+PyObject *Py_Sockaddr_Addr(struct sockaddr *sockaddr){
     // inet addr of socket
     char host[NI_MAXHOST];
     int s = sockaddr_addr(sockaddr, host);
 
     if(s==0){
         PyObject *py_addr = Py_BuildValue("s", host);
-        PyDict_SetItemString(sockaddr_dict, "address", py_addr);
+        if(py_addr == NULL){
+            PyErr_NoMemory();
+        }
+        return py_addr;
     }
 
-    if(sockaddr_dict == NULL){
-        PyErr_SetString(PyExc_ValueError, "Error retrieving sockaddr information");
-        return NULL;
-    }
-    return sockaddr_dict;
+    // if s failed, then fall through to returning None
+    // Py_RETURN_NONE takes care of incref on PyNone
+    Py_RETURN_NONE;
 }
 
 /*
@@ -61,27 +49,36 @@ PyObject *Py_Build_Addr(pcap_addr_t *addr){
         PyErr_NoMemory();
     }
 
-    // addr
-    PyObject *py_addr = Py_Build_Sockaddr(addr->addr);
-    PyDict_SetItemString(addr_dict, "addr", py_addr);
+    // address family and address
+    if(addr->addr != NULL){
+        // af
+        char *af = af_to_string(addr->addr->sa_family);
+        PyObject *py_af = Py_BuildValue("s", af);
+        if(py_af == NULL){
+            PyErr_NoMemory();
+        }
+        PyDict_SetItemString(addr_dict, "af", py_af);
+
+        // addr
+        PyObject *py_addr = Py_Sockaddr_Addr(addr->addr);
+        PyDict_SetItemString(addr_dict, "addr", py_addr);
+    }
 
     // netmask
-    // TODO: pass this directly to Py_Build_Sockaddr
-    //       that way we get a more compact dict
     if(addr->netmask != NULL){
-        PyObject *nmask = Py_Build_Sockaddr(addr->netmask);
+        PyObject *nmask = Py_Sockaddr_Addr(addr->netmask);
         PyDict_SetItemString(addr_dict, "netmask", nmask);
     }
 
     // broadaddr
     if(addr->broadaddr != NULL){
-        PyObject *nmask = Py_Build_Sockaddr(addr->broadaddr);
+        PyObject *nmask = Py_Sockaddr_Addr(addr->broadaddr);
         PyDict_SetItemString(addr_dict, "broadaddr", nmask);
     }
 
     // dstaddr
     if(addr->dstaddr != NULL){
-        PyObject *nmask = Py_Build_Sockaddr(addr->dstaddr);
+        PyObject *nmask = Py_Sockaddr_Addr(addr->dstaddr);
         PyDict_SetItemString(addr_dict, "dstaddr", nmask);
     }
 
