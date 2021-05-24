@@ -5,7 +5,12 @@
 #include <structmember.h>
 #include <pcap.h>
 #include <errno.h>
+
+#ifndef PYPCAP_UTIL
 #include "util.h"
+#endif
+
+#define PYPCAP_READER
 
 typedef struct{
     PyObject_HEAD

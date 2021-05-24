@@ -1,7 +1,13 @@
 #include <pcap.h>
 #include "pypcap.h"
+
+#ifndef PYPCAP_WRITER
 #include "writer.h"
-//#include "reader.h" //included this already in writer.h; figure out how ifndef works
+#endif
+
+#ifndef PYPCAP_READER
+#include "reader.h"
+#endif
 
 /*
 Methods to create python objects
@@ -98,7 +104,7 @@ PyObject *Py_Build_Interface(pcap_if_t *iface){
         "{s:s, s:s, s:i}",
         "name", iface->name,
         "description", iface->description,
-        "flags", iface->flags
+        "flags_int", iface->flags
     );
 
     // Build address information
@@ -122,6 +128,24 @@ PyObject *Py_Build_Interface(pcap_if_t *iface){
     int addr_set = PyDict_SetItemString(iface_dict, "addresses", addr_list);
     if(addr_set == -1){
         PyErr_SetString(PyExc_ValueError, "Could not set 'addresses' value in interface dict");
+        return NULL;
+    }
+
+    // Parse flags into strings
+    struct pflags pf = pcap_flags(iface->flags);
+    PyObject *flag_list = PyList_New(pf.size);
+    if(flag_list == NULL)
+        PyErr_NoMemory();
+
+    for(Py_ssize_t i=0; i<pf.size; i++){
+        PyObject *f = Py_BuildValue("s", pf.flags[i]);
+        if(f == NULL)
+            PyErr_NoMemory();
+        PyList_SetItem(flag_list, i, f);
+    }
+    int set = PyDict_SetItemString(iface_dict, "flags", flag_list);
+    if(set == -1){
+        PyErr_SetString(PyExc_ValueError, "Could not parse interface status flags");
         return NULL;
     }
 

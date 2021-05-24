@@ -5,8 +5,12 @@
 #include <structmember.h>
 #include <stdio.h>
 #include "reader.h"
-#include "util.h"
 
+#ifndef PYPCAP_UTIL
+#include "util.h"
+#endif
+
+#define PYPCAP_WRITER
 #define LINKTYPE_ETHERNET 1
 #define MAX_PACKET_SIZE 65536
 

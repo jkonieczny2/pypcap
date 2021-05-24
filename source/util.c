@@ -1,7 +1,12 @@
 #include <arpa/inet.h>
-#include "util.h"
 #include <netdb.h>
 #include <sys/socket.h>
+#include <pcap.h>
+#include <pcap/bpf.h>
+
+#ifndef PYPCAP_UTIL
+#include "util.h"
+#endif
 
 char *af_to_string(int domain){
     if(domain == AF_INET){
@@ -37,6 +42,38 @@ int sockaddr_addr(struct sockaddr *sockaddr, char *host){
     }
 
     return s;
+}
+
+/*
+Convert pcap_if_t->flags to array of strings
+*/
+struct pflags pcap_flags(bpf_u_int32 flags){
+    int i = 0;
+    struct pflags pf;
+
+    int all_flags[PCAP_FLAG_MAX] = {
+        PCAP_IF_LOOPBACK,
+        PCAP_IF_UP,
+        PCAP_IF_RUNNING,
+        PCAP_IF_WIRELESS
+    };
+
+    char *flag_str[PCAP_FLAG_MAX] = {
+        "LOOPBACK",
+        "UP",
+        "RUNNING",
+        "WIRELESS"
+    };
+
+    for(int j=0; j<PCAP_FLAG_MAX; j++){
+        if(flags & all_flags[j]){
+            pf.flags[i] = flag_str[j];
+            i++;
+        }
+    }
+
+    pf.size = i;
+    return pf;
 }
 
 /* utility method to get strings out of PyUnicode objects */
