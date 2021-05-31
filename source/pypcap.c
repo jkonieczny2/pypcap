@@ -18,9 +18,8 @@ Return number of items in a linked list of pcap_addr_t
 */
 Py_ssize_t len_addresses(pcap_addr_t *addr){
     Py_ssize_t count = 0;
-    while(addr != NULL){
+    for(pcap_addr_t *a = addr; a != NULL; a = a->next){
         count++;
-        addr = addr->next;
     }
     return count;
 }
@@ -180,11 +179,10 @@ find_all_devs(PyObject *self, PyObject *args)
     // build dict of interface details
     PyObject *iface_dict = PyDict_New();
 
-    while(iface != NULL){
-        PyObject *idict = Py_Build_Interface(iface);
-        PyObject *iface_name = Py_BuildValue("s", iface->name);
+    for(pcap_if_t *i = iface; i != NULL; i = i->next){
+        PyObject *idict = Py_Build_Interface(i);
+        PyObject *iface_name = Py_BuildValue("s", i->name);
         PyDict_SetItem(iface_dict, iface_name, idict);
-        iface = iface->next;
     }
 
     // clean up iface objects
