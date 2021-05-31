@@ -12,7 +12,10 @@
 
 #define PYPCAP_WRITER
 #define LINKTYPE_ETHERNET 1
-#define MAX_PACKET_SIZE 65536
+
+#ifndef MAX_PACKET_SIZE
+#define MAX_PACKET_SIZE 65535
+#endif
 
 typedef struct{
     PyObject_HEAD

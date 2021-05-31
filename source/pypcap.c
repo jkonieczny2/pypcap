@@ -9,6 +9,10 @@
 #include "reader.h"
 #endif
 
+#ifndef PYPCAP_CAPTURE
+#include "capture.h"
+#endif
+
 /*
 Methods to create python objects
 */
@@ -225,6 +229,8 @@ PyInit_pypcap(void)
         return NULL;
     if (PyType_Ready(&PcapReaderType) < 0)
         return NULL;
+    if (PyType_Ready(&PcapCaptureType) < 0)
+        return NULL;
 
     m = PyModule_Create(&pypcap);
     if(m == NULL)
@@ -240,6 +246,13 @@ PyInit_pypcap(void)
     Py_INCREF(&PcapReaderType);
     if(PyModule_AddObject(m, "PcapReader", (PyObject *) &PcapReaderType) < 0){
         Py_DECREF(&PcapReaderType);
+        Py_DECREF(m);
+        return NULL;
+    };
+
+    Py_INCREF(&PcapCaptureType);
+    if(PyModule_AddObject(m, "PcapCapture", (PyObject *) &PcapCaptureType) < 0){
+        Py_DECREF(&PcapCaptureType);
         Py_DECREF(m);
         return NULL;
     };
