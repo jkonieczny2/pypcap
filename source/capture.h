@@ -25,6 +25,8 @@ typedef struct{
     int _timeout_ms;
     char *_output_filename;
     int _max_packets;
+    char _errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *_pcap;
     /* Python properties */
     PyObject *interface_name;
     PyObject *packet_len;
@@ -74,7 +76,7 @@ PcapCapture_init(PcapCapture *self, PyObject *args, PyObject *kwds)
     if(interface_name){
         char *iface_name = PyUnicode_ToString(interface_name);
         if(iface_name == NULL){
-            PyErr_SetString(PyExc_ValueError, "Could not convert interface name to a c string");
+            PyErr_SetString(PyExc_ValueError, "Could not convert interface_name into C string");
             return -1;
         }
         self->_interface_name = iface_name;
@@ -87,12 +89,12 @@ PcapCapture_init(PcapCapture *self, PyObject *args, PyObject *kwds)
 
     // output filename
     if(output_filename){
-        char *output = PyUnicode_ToString(output_filename);
-        if(output == NULL){
-            PyErr_SetString(PyExc_ValueError, "Could not convert output filename to a c string");
+        char *fname = PyUnicode_ToString(output_filename);
+        if(fname == NULL){
+            PyErr_SetString(PyExc_ValueError, "Could not convert output_filename into C string");
             return -1;
         }
-        self->_output_filename = output;
+        self->_output_filename = fname;
 
         tmp = self->output_filename;
         Py_INCREF(output_filename);
@@ -158,19 +160,64 @@ PcapCapture_init(PcapCapture *self, PyObject *args, PyObject *kwds)
     self->packet_len = packet_length;
     Py_XDECREF(tmp);
 
-    // create pcap dumper
-
     return 0;
 }
 
+static PyObject *
+PcapCapture_start(PcapCapture *self, PyObject *args)
+{
+    // open live pcap captures on interface
+    pcap_t *pcap = pcap_open_live(
+        self->_interface_name,
+        self->_packet_len,
+        self->_promisc,
+        self->_timeout_ms,
+        self->_errbuf
+    );
+
+    if(pcap == NULL){
+        PyErr_Format(PyExc_SystemError, "Could not open interface %s for packet capture: %s", self->_interface_name, self->_errbuf);
+        return NULL;
+    }
+    self->_pcap = pcap;
+
+    pcap_dumper_t *d = pcap_dump_open(self->_pcap, self->_output_filename);
+    if(d == NULL){
+        PyErr_Format(PyExc_SystemError, "Could not open pcap dumper for %s", self->_output_filename);
+        return NULL;
+    }
+
+    int processed = pcap_loop(
+        self->_pcap,
+        self->_max_packets,
+        pcap_dump_handler,
+        (u_char *)d
+    );
+
+    // TODO: call get_error for better alert here
+    if(processed != 0){
+        PyErr_Format(PyExc_SystemError, "Problem processing pcaps on interface %s", self->_interface_name);
+        return NULL;
+    }
+
+    return Py_BuildValue("");
+}
 /* expose attributes as custom members */
 static PyMemberDef PcapCapture_members[] = {
+    {"_interface_name", T_STRING, offsetof(PcapCapture, _interface_name), 0, "c string for interface name"},
+    {"_packet_len", T_INT, offsetof(PcapCapture, _packet_len), 0, "c int for packet length"},
+    {"_promisc", T_INT, offsetof(PcapCapture, _promisc), 0, "c int for promiscuous mode"},
+    {"_timeout_ms", T_INT, offsetof(PcapCapture, _timeout_ms), 0, "c int for timeout in ms"},
+    {"_output_filename", T_STRING, offsetof(PcapCapture, _output_filename), 0, "c string for output filename"},
+    {"_max_packets", T_INT, offsetof(PcapCapture, _max_packets), 0, "c int for max packets"},
+    {"_errbuf", T_STRING, offsetof(PcapCapture, _errbuf), 0, "pcap errbuf"},
+    {"_pcap", T_OBJECT_EX, offsetof(PcapCapture, _pcap), 0, "pcap_t pointer"},
     {NULL}
 };
 
 /* expose methods */
 static PyMethodDef PcapCapture_methods[] = {
-//    {"close", (PyCFunction) PcapCapture_close, METH_NOARGS, "Close the object's file pointer"},
+    {"start", (PyCFunction) PcapCapture_start, METH_NOARGS, "Start capturing pcaps on self.interface_name and write them to self.output_filename"},
     {NULL}
 };
 
@@ -260,7 +307,6 @@ static PyGetSetDef PcapCapture_getsetters[] = {
     {"promisc", (getter) PcapCapture_get_promisc, (setter) PcapCapture_set_promisc, "promisc", NULL},
     {"timeout_ms", (getter) PcapCapture_get_timeout_ms, (setter) PcapCapture_set_timeout_ms, "timeout_ms", NULL},
     {"packet_length", (getter) PcapCapture_get_packet_len, (setter) PcapCapture_set_packet_len, "packet_length", NULL},
-
     {NULL}
 };
 
@@ -268,6 +314,7 @@ static PyGetSetDef PcapCapture_getsetters[] = {
 static int
 PcapCapture_traverse(PcapCapture *self, visitproc visit, void *arg)
 {
+
     Py_VISIT(self->interface_name);
     Py_VISIT(self->output_filename);
     Py_VISIT(self->max_packets);

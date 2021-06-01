@@ -100,8 +100,12 @@ PyUnicode_ToString(PyObject *obj){
 
     // clean up references, not 100% sure if this is necessary
     Py_DECREF(obj);
-    Py_DECREF(ascii_string);
 
     return c_str;
 }
 
+/* dumps pcaps to file as they are received by pcap_loop or pcap_dispatch */
+void pcap_dump_handler(u_char *args, const struct pcap_pkthdr *hdr, const u_char *packet){
+    // pcap_dumper_t *args
+    pcap_dump(args, hdr, packet);
+}
